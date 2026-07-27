@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daftar Menu - Kopi Barat</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="menu-page">
+
+    <!-- NAVBAR -->
+    <header class="navbar">
+        <div class="logo">KOPI <span>BARAT.</span></div>
+        <nav>
+            <a href="kafe.html">Home</a>
+            <a href="menu.html" class="active">Menu</a>
+        </nav>
+    </header>
+
+    <!-- HEADER HALAMAN MENU -->
+    <section class="menu-header">
+        <h1>Daftar Menu Kopi Barat</h1>
+        <p>Pesan langsung secara online.</p>
+    </section>
+
+    <!-- CONTAINER DAFTAR MENU -->
+    <main class="menu-container">
+        <div id="dynamic-menu-list">
+            <!-- Menu di-render dari Database Admin via JS -->
+        </div>
+    </main>
+
+    <!-- MODAL 1: FORM PEMESANAN CUSTOMER -->
+    <div id="modal-order" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal('modal-order')">&times;</span>
+            <h2>Konfirmasi Pesanan</h2>
+            <form id="form-customer-order">
+                <input type="hidden" id="order-produk-index">
+                
+                <div class="form-group-modal">
+                    <label>Produk Dipilih:</label>
+                    <h3 id="order-nama-produk" class="text-accent">-</h3>
+                </div>
+
+                <div class="form-group-modal">
+                    <label>Harga Satuan:</label>
+                    <p id="order-harga-produk">Rp 0</p>
+                </div>
+
+                <div class="form-group-modal">
+                    <label>Jumlah Beli:</label>
+                    <input type="number" id="order-jumlah" min="1" value="1" onchange="hitungkanTotal()" onkeyup="hitungkanTotal()" required>
+                </div>
+
+                <div class="form-group-modal">
+                    <label>Tipe Pesanan:</label>
+                    <select id="order-tipe" required>
+                        <option value="Online (Pengiriman Direct)">Online (Pengiriman Direct)</option>
+                        <option value="Offline (Pick-up di Kedai)">Offline (Ambil di Kedai Puri Indah)</option>
+                    </select>
+                </div>
+
+                <div class="form-group-modal total-box">
+                    <span>Total Pembayaran:</span>
+                    <strong id="order-total-harga">Rp 0</strong>
+                </div>
+
+                <button type="submit" class="btn-primary btn-block">Konfirmasi & Bayar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: TAMPILAN QR CODE PEMBAYARAN -->
+    <div id="modal-qr" class="modal">
+        <div class="modal-content text-center">
+            <span class="close-modal" onclick="closeModal('modal-qr')">&times;</span>
+            <h2>Scan QRIS untuk Membayar</h2>
+            <p class="qr-subtitle">Pesanan Anda telah berhasil dipesan.</p>
+            
+            <div class="qr-container">
+                <!-- Ganti file gambar berikut dengan nama file QR Anda -->
+                <img src="qr-code.png" alt="QR Code Pembayaran Kopi Barat" class="qr-image">
+            </div>
+
+            <div class="form-group-modal total-box margin-top">
+                <span>Total yang Harus Dibayar:</span>
+                <strong id="qr-total-bayar">Rp 0</strong>
+            </div>
+
+            <button onclick="selesaiPembayaran()" class="btn-primary btn-block">Saya Sudah Bayar</button>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="mini-footer">
+        <p>&copy; 2026 Kopi Barat Jakarta Barat. Terintegrasi dengan Sistem Database Admin.</p>
+    </footer>
+
+    <!-- SCRIPT LOGIKA KONEKSI DATABASE & MODAL DUAL -->
+    <script>
+        const initialProducts = [
+            { id: "KB01", nama: "Espresso Intenso", kategori: "Based on Espresso", harga: 25000, stok: 45, deskripsi: "Ekstraksi murni biji kopi arabika lokal." },
+            { id: "KB02", nama: "Velvet Latte", kategori: "Based on Espresso", harga: 32000, stok: 30, deskripsi: "Espresso lembut dengan susu segar bertekstur creamy." },
+            { id: "KB03", nama: "West Cold Brew", kategori: "Based on Espresso", harga: 35000, stok: 18, deskripsi: "Kopi seduh dingin difermentasi 12 jam." },
+            { id: "KB04", nama: "Kopi Susu Gula Aren", kategori: "Based on Espresso", harga: 28000, stok: 60, deskripsi: "Kopi susu manis legit dengan gula aren asli." },
+            { id: "KB05", nama: "Artisan Matcha Latte", kategori: "Non-Coffee", harga: 34000, stok: 20, deskripsi: "Matcha premium Jepang berpadu susu segar." },
+            { id: "KB06", nama: "Butter Croissant", kategori: "Pastry & Snacks", harga: 27000, stok: 12, deskripsi: "Pastry renyah berlapis khas Kopi Barat." }
+        ];
+
+        function getProduk() {
+            if (!localStorage.getItem('kopi_produk')) {
+                localStorage.setItem('kopi_produk', JSON.stringify(initialProducts));
+            }
+            return JSON.parse(localStorage.getItem('kopi_produk'));
+        }
+
+        function getPenjualan() {
+            if (!localStorage.getItem('kopi_penjualan')) {
+                localStorage.setItem('kopi_penjualan', JSON.stringify([]));
+            }
+            return JSON.parse(localStorage.getItem('kopi_penjualan'));
+        }
+
+        function formatRupiah(angka) {
+            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(angka);
+        }
+
+        function renderMenu() {
+            const produkList = getProduk();
+            const container = document.getElementById('dynamic-menu-list');
+            container.innerHTML = '';
+
+            const kategoriMap = {};
+            produkList.forEach((item, index) => {
+                const kat = item.kategori || "Menu Utama";
+                if (!kategoriMap[kat]) kategoriMap[kat] = [];
+                kategoriMap[kat].push({ ...item, originalIndex: index });
+            });
+
+            for (const [kategori, items] of Object.entries(kategoriMap)) {
+                let html = `
+                    <div class="menu-category">
+                        <h2>${kategori}</h2>
+                        <div class="menu-list">
+                `;
+
+                items.forEach(item => {
+                    const isStokHabis = item.stok <= 0;
+                    html += `
+                        <div class="menu-item ${isStokHabis ? 'out-of-stock' : ''}">
+                            <div class="menu-details">
+                                <h3>${item.nama}</h3>
+                                <p>${item.deskripsi || 'Sajian kopi nikmat khas Kopi Barat.'}</p>
+                                <span class="stok-tag ${isStokHabis ? 'tag-empty' : ''}">
+                                    ${isStokHabis ? 'Stok Habis' : 'Sisa Stok: ' + item.stok}
+                                </span>
+                            </div>
+                            <div class="menu-action">
+                                <span class="menu-price">${formatRupiah(item.harga)}</span>
+                                <button 
+                                    class="btn-buy" 
+                                    onclick="openModalOrder(${item.originalIndex})" 
+                                    ${isStokHabis ? 'disabled' : ''}>
+                                    ${isStokHabis ? 'Habis' : 'Beli'}
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `</div></div>`;
+                container.innerHTML += html;
+            }
+        }
+
+        function openModalOrder(index) {
+            const produkList = getProduk();
+            const item = produkList[index];
+
+            document.getElementById('order-produk-index').value = index;
+            document.getElementById('order-nama-produk').innerText = item.nama;
+            document.getElementById('order-harga-produk').innerText = formatRupiah(item.harga);
+            document.getElementById('order-jumlah').value = 1;
+            document.getElementById('order-jumlah').max = item.stok;
+
+            hitungkanTotal();
+            document.getElementById('modal-order').style.display = 'flex';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        function hitungkanTotal() {
+            const index = document.getElementById('order-produk-index').value;
+            const jumlah = parseInt(document.getElementById('order-jumlah').value) || 1;
+            const produkList = getProduk();
+            const item = produkList[index];
+
+            const total = item.harga * jumlah;
+            document.getElementById('order-total-harga').innerText = formatRupiah(total);
+        }
+
+        // AKSI SAAT TOMBOL "KONFIRMASI & BAYAR" DITEKAN
+        document.getElementById('form-customer-order').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const index = document.getElementById('order-produk-index').value;
+            const jumlah = parseInt(document.getElementById('order-jumlah').value);
+            const tipe = document.getElementById('order-tipe').value;
+
+            const produkList = getProduk();
+            const selectedItem = produkList[index];
+
+            if (selectedItem.stok < jumlah) {
+                alert(`Maaf, stok tidak mencukupi! Stok tersisa hanya ${selectedItem.stok}`);
+                return;
+            }
+
+            // 1. KURANGI STOK DI DATABASE ADMIN (LOCALSTORAGE)
+            selectedItem.stok -= jumlah;
+            produkList[index] = selectedItem;
+            localStorage.setItem('kopi_produk', JSON.stringify(produkList));
+
+            // 2. CATAT TRANSAKSI
+            const penjualanList = getPenjualan();
+            const now = new Date();
+            const waktuStr = `${now.toLocaleDateString('id-ID')} ${now.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}`;
+            const totalHarga = selectedItem.harga * jumlah;
+
+            penjualanList.push({
+                waktu: waktuStr,
+                nama: selectedItem.nama,
+                tipe: tipe,
+                jumlah: jumlah,
+                total: totalHarga
+            });
+
+            localStorage.setItem('kopi_penjualan', JSON.stringify(penjualanList));
+
+            // 3. TUTUP MODAL FORM & BUKAJANAN MODAL QR CODE BERSAMAAN
+            closeModal('modal-order');
+            document.getElementById('qr-total-bayar').innerText = formatRupiah(totalHarga);
+            document.getElementById('modal-qr').style.display = 'flex';
+
+            // Re-render stok di tampilan menu
+            renderMenu();
+        });
+
+        function selesaiPembayaran() {
+            alert("Terima kasih! Pesanan Anda sedang diproses oleh Barista Kopi Barat.");
+            closeModal('modal-qr');
+        }
+
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+
+        renderMenu();
+    </script>
+</body>
+</html>

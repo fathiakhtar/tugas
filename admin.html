@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Admin & Database - Kopi Barat</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="admin-page">
+
+    <!-- NAVBAR -->
+    <header class="navbar">
+        <div class="logo">KOPI <span>BARAT.</span> <small style="font-size:0.6em; opacity:0.6;">(Admin Panel)</small></div>
+        <nav>
+            <a href="index.html">Ke Website Utama</a>
+            <a href="menu.html">Menu</a>
+            <button onclick="resetDataKeDefault()" class="btn-danger-small">Reset Data Default</button>
+        </nav>
+    </header>
+
+    <main class="admin-container">
+        
+        <!-- RINGKASAN STATISTIK -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Pendapatan</h3>
+                <p id="total-pendapatan">Rp 0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Total Transaksi</h3>
+                <p id="total-transaksi">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Total Jenis Menu</h3>
+                <p id="total-menu">0</p>
+            </div>
+        </section>
+
+        <!-- KELOLA STOK DAN HARGA -->
+        <section class="admin-section">
+            <h2>📦 Database Stok & Harga Produk</h2>
+            <div class="table-responsive">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nama Menu</th>
+                            <th>Kategori</th>
+                            <th>Harga (Rp)</th>
+                            <th>Stok</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabel-produk">
+                        <!-- Data produk diisi dari JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- INPUT TRANSAKSI PENJUALAN BARU -->
+        <section class="admin-section">
+            <h2>🛒 Input Penjualan Baru (Kasir / POS)</h2>
+            <form id="form-penjualan" class="form-grid">
+                <div class="form-group">
+                    <label>Pilih Menu</label>
+                    <select id="pilih-produk" required>
+                        <!-- Diisi via JavaScript -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Jumlah Beli</label>
+                    <input type="number" id="jumlah-beli" min="1" value="1" required>
+                </div>
+                <div class="form-group">
+                    <label>Tipe Pesanan</label>
+                    <select id="tipe-pesanan" required>
+                        <option value="Offline (Dine In/Takeaway)">Offline (Di Kedai)</option>
+                        <option value="Online (Ojek Online/WA)">Online (Pengiriman)</option>
+                    </select>
+                </div>
+                <div class="form-group btn-group">
+                    <button type="submit" class="btn-primary">Catat Transaksi</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- RIWAYAT PENJUALAN -->
+        <section class="admin-section">
+            <h2>📜 Riwayat Penjualan</h2>
+            <div class="table-responsive">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Waktu</th>
+                            <th>Nama Produk</th>
+                            <th>Tipe</th>
+                            <th>Jumlah</th>
+                            <th>Total Harga</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabel-penjualan">
+                        <!-- Data riwayat diisi dari JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- SCRIPT JAVASCRIPT UNTUK LOGIKA DATABASE LOCALSTORAGE -->
+    <script>
+        // Data awal (Seed Data) jika database lokal masih kosong
+        const initialProducts = [
+            { id: "KB01", nama: "Espresso Intenso", kategori: "Espresso", harga: 25000, stok: 45 },
+            { id: "KB02", nama: "Velvet Latte", kategori: "Espresso", harga: 32000, stok: 30 },
+            { id: "KB03", nama: "West Cold Brew", kategori: "Cold Brew", harga: 35000, stok: 18 },
+            { id: "KB04", nama: "Kopi Susu Gula Aren", kategori: "Espresso", harga: 28000, stok: 60 },
+            { id: "KB05", nama: "Artisan Matcha Latte", kategori: "Non-Coffee", harga: 34000, stok: 20 },
+            { id: "KB06", nama: "Butter Croissant", kategori: "Pastry", harga: 27000, stok: 12 }
+        ];
+
+        // Inisialisasi Database LocalStorage
+        function initDB() {
+            if (!localStorage.getItem('kopi_produk')) {
+                localStorage.setItem('kopi_produk', JSON.stringify(initialProducts));
+            }
+            if (!localStorage.getItem('kopi_penjualan')) {
+                localStorage.setItem('kopi_penjualan', JSON.stringify([]));
+            }
+        }
+
+        // Ambil data dari LocalStorage
+        function getProduk() { return JSON.parse(localStorage.getItem('kopi_produk')); }
+        function getPenjualan() { return JSON.parse(localStorage.getItem('kopi_penjualan')); }
+
+        // Format angka ke Rupiah
+        function formatRupiah(angka) {
+            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(angka);
+        }
+
+        // Render Tampilan Dashboard
+        function renderAll() {
+            const produkList = getProduk();
+            const penjualanList = getPenjualan();
+
+            // 1. Render Tabel Produk & Select Form
+            const tabelProduk = document.getElementById('tabel-produk');
+            const selectProduk = document.getElementById('pilih-produk');
+            
+            tabelProduk.innerHTML = '';
+            selectProduk.innerHTML = '';
+
+            produkList.forEach((item, index) => {
+                // Render Tabel Stok & Harga
+                tabelProduk.innerHTML += `
+                    <tr>
+                        <td><strong>${item.id}</strong></td>
+                        <td>${item.nama}</td>
+                        <td>${item.kategori}</td>
+                        <td>
+                            <input type="number" value="${item.harga}" class="input-table" id="harga-${index}">
+                        </td>
+                        <td>
+                            <input type="number" value="${item.stok}" class="input-table" id="stok-${index}">
+                        </td>
+                        <td>
+                            <button onclick="updateProduk(${index})" class="btn-update">Simpan</button>
+                        </td>
+                    </tr>
+                `;
+
+                // Render Option Select
+                selectProduk.innerHTML += `<option value="${index}">${item.nama} - Stok: ${item.stok}</option>`;
+            });
+
+            // 2. Render Tabel Penjualan
+            const tabelPenjualan = document.getElementById('tabel-penjualan');
+            tabelPenjualan.innerHTML = '';
+
+            let totalOmset = 0;
+            penjualanList.slice().reverse().forEach(p => {
+                totalOmset += p.total;
+                tabelPenjualan.innerHTML += `
+                    <tr>
+                        <td>${p.waktu}</td>
+                        <td><strong>${p.nama}</strong></td>
+                        <td><span class="badge ${p.tipe.includes('Online') ? 'badge-online' : 'badge-offline'}">${p.tipe}</span></td>
+                        <td>${p.jumlah}</td>
+                        <td>${formatRupiah(p.total)}</td>
+                    </tr>
+                `;
+            });
+
+            // 3. Update Ringkasan Stat
+            document.getElementById('total-pendapatan').innerText = formatRupiah(totalOmset);
+            document.getElementById('total-transaksi').innerText = penjualanList.length;
+            document.getElementById('total-menu').innerText = produkList.length;
+        }
+
+        // Update Harga & Stok Produk dari Tabel
+        function updateProduk(index) {
+            const produkList = getProduk();
+            const hargaBaru = parseInt(document.getElementById(`harga-${index}`).value);
+            const stokBaru = parseInt(document.getElementById(`stok-${index}`).value);
+
+            if (isNaN(hargaBaru) || isNaN(stokBaru)) {
+                alert("Harap masukkan angka yang valid!");
+                return;
+            }
+
+            produkList[index].harga = hargaBaru;
+            produkList[index].stok = stokBaru;
+
+            localStorage.setItem('kopi_produk', JSON.stringify(produkList));
+            alert(`Berhasil memperbarui data untuk ${produkList[index].nama}!`);
+            renderAll();
+        }
+
+        // Proses Input Transaksi Penjualan
+        document.getElementById('form-penjualan').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const produkIndex = document.getElementById('pilih-produk').value;
+            const jumlah = parseInt(document.getElementById('jumlah-beli').value);
+            const tipe = document.getElementById('tipe-pesanan').value;
+
+            const produkList = getProduk();
+            const selectedItem = produkList[produkIndex];
+
+            // Cek Ketersediaan Stok
+            if (selectedItem.stok < jumlah) {
+                alert(`Stok tidak cukup! Stok ${selectedItem.nama} tersisa: ${selectedItem.stok}`);
+                return;
+            }
+
+            // Kurangi Stok
+            selectedItem.stok -= jumlah;
+            produkList[produkIndex] = selectedItem;
+            localStorage.setItem('kopi_produk', JSON.stringify(produkList));
+
+            // Catat Penjualan
+            const penjualanList = getPenjualan();
+            const now = new Date();
+            const waktuStr = `${now.toLocaleDateString('id-ID')} ${now.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}`;
+
+            penjualanList.push({
+                waktu: waktuStr,
+                nama: selectedItem.nama,
+                tipe: tipe,
+                jumlah: jumlah,
+                total: selectedItem.harga * jumlah
+            });
+
+            localStorage.setItem('kopi_penjualan', JSON.stringify(penjualanList));
+
+            alert("Transaksi berhasil dicatat!");
+            renderAll();
+        });
+
+        // Reset Data Kembali Ke Kondisi Awal
+        function resetDataKeDefault() {
+            if (confirm("Apakah Anda yakin ingin menghapus semua riwayat transaksi dan mengembalikan stok/harga awal?")) {
+                localStorage.removeItem('kopi_produk');
+                localStorage.removeItem('kopi_penjualan');
+                initDB();
+                renderAll();
+            }
+        }
+
+        // Jalankan saat pertama dimuat
+        initDB();
+        renderAll();
+    </script>
+
+</body>
+</html>
